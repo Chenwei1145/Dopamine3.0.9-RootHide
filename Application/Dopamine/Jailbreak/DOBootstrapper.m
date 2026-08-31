@@ -1106,10 +1106,56 @@ int getCFMajorVersion(void)
 
 -(int) fixBootstrapSymlink:(NSString*)path
 {
-    const char* jbpath = jbrootPrefix(path).fileSystemRepresentation;
-    
+    NSString *jbrootPath = jbrootPrefix(path);
+    if (!jbrootPath) {
+        return ENOENT;
+    }
+    const char* jbpath = jbrootPath.fileSystemRepresentation;
+
+    // A previous interrupted bootstrap can leave the marker links (or /bin/sh)
+    // missing after jbroot re-randomization.  Recreate only the links that are
+    // known to be part of the roothide bootstrap; never overwrite a real file.
+    NSArray *markerLinks = @[
+        @[@"/.jbroot", @"."],
+        @[@"/bin/.jbroot", @"../.jbroot"],
+        @[@"/usr/bin/.jbroot", @"../../.jbroot"],
+    ];
+    for (NSArray *entry in markerLinks) {
+        NSString *markerPath = jbrootPrefix(entry[0]);
+        const char *markerCPath = markerPath.fileSystemRepresentation;
+        struct stat markerStat = {0};
+        if (lstat(markerCPath, &markerStat) != 0) {
+            if (errno != ENOENT || symlink(entry[1].UTF8String, markerCPath) != 0) {
+                return errno;
+            }
+            STRAPLOG("Repaired missing roothide marker %@ -> %@", entry[0], entry[1]);
+        } else if (S_ISLNK(markerStat.st_mode) && access(markerCPath, F_OK) != 0) {
+            // Repair a dangling marker link, which otherwise makes /bin/sh
+            // appear to be missing even when usr/bin/dash is present.
+            if (unlink(markerCPath) != 0 || symlink(entry[1].UTF8String, markerCPath) != 0) {
+                return errno;
+            }
+            STRAPLOG("Repaired dangling roothide marker %@ -> %@", entry[0], entry[1]);
+        }
+    }
+
+    BOOL isShellLink = [path isEqualToString:@"/bin/sh"] || [path isEqualToString:@"/usr/bin/sh"];
+    NSString *shellTarget = @".jbroot/usr/bin/dash";
+
     struct stat st={0};
     if(lstat(jbpath, &st) != 0) {
+        if (errno == ENOENT && isShellLink) {
+            // Both shell links in the roothide bootstrap intentionally point
+            // through the per-directory .jbroot marker.
+            if (access(jbrootPrefix(@"/usr/bin/dash").fileSystemRepresentation, F_OK) != 0) {
+                return errno;
+            }
+            if (symlink(shellTarget.UTF8String, jbpath) != 0) {
+                return errno;
+            }
+            STRAPLOG("Repaired missing bootstrap symlink %@ -> %@", path, shellTarget);
+            return access(jbpath, F_OK) == 0 ? 0 : errno;
+        }
         return errno;
     }
     
@@ -1122,7 +1168,19 @@ int getCFMajorVersion(void)
         return errno != 0 ? errno : -1;
     }
     if(link[0] != '/') {
-        return 0;
+        // Relative links are the normal roothide layout.  Do not accept a
+        // dangling one; repair the shell links when possible.
+        if (access(jbpath, F_OK) == 0) {
+            return 0;
+        }
+        if (!isShellLink || access(jbrootPrefix(@"/usr/bin/dash").fileSystemRepresentation, F_OK) != 0) {
+            return errno;
+        }
+        if (unlink(jbpath) != 0 || symlink(shellTarget.UTF8String, jbpath) != 0) {
+            return errno;
+        }
+        STRAPLOG("Repaired dangling bootstrap symlink %@ -> %@", path, shellTarget);
+        return access(jbpath, F_OK) == 0 ? 0 : errno;
     }
 
     //stringByStandardizingPath won't remove /private/ prefix if the path does not exist on disk
@@ -1184,7 +1242,7 @@ int getCFMajorVersion(void)
         {
             int r = [self fixBootstrapSymlink:slink];
             if(r != 0) {
-                return [NSError errorWithDomain:bootstrapErrorDomain code:BootstrapErrorCodeFailedFinalising userInfo:@{NSLocalizedDescriptionKey : [NSString stringWithFormat:@"fixBootstrapSymlink(%@) returned %d\n", slink, r]}];
+                return [NSError errorWithDomain:bootstrapErrorDomain code:BootstrapErrorCodeFailedFinalising userInfo:@{NSLocalizedDescriptionKey : [NSString stringWithFormat:@"fixBootstrapSymlink(%@) returned %d (%s), jbroot=%@\n", slink, r, strerror(r), find_jbroot(NO) ?: @"<missing>"]}];
             }
         }
         
