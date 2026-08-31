@@ -1115,27 +1115,32 @@ int getCFMajorVersion(void)
     // A previous interrupted bootstrap can leave the marker links (or /bin/sh)
     // missing after jbroot re-randomization.  Recreate only the links that are
     // known to be part of the roothide bootstrap; never overwrite a real file.
-    NSArray *markerLinks = @[
+    NSArray<NSArray<NSString *> *> *markerLinks = @[
         @[@"/.jbroot", @"."],
         @[@"/bin/.jbroot", @"../.jbroot"],
         @[@"/usr/bin/.jbroot", @"../../.jbroot"],
     ];
-    for (NSArray *entry in markerLinks) {
-        NSString *markerPath = jbrootPrefix(entry[0]);
+    for (NSArray<NSString *> *entry in markerLinks) {
+        NSString *markerRelativePath = entry[0];
+        NSString *markerTarget = entry[1];
+        NSString *markerPath = jbrootPrefix(markerRelativePath);
+        if (!markerPath) {
+            return ENOENT;
+        }
         const char *markerCPath = markerPath.fileSystemRepresentation;
         struct stat markerStat = {0};
         if (lstat(markerCPath, &markerStat) != 0) {
-            if (errno != ENOENT || symlink(entry[1].UTF8String, markerCPath) != 0) {
+            if (errno != ENOENT || symlink(markerTarget.UTF8String, markerCPath) != 0) {
                 return errno;
             }
-            STRAPLOG("Repaired missing roothide marker %@ -> %@", entry[0], entry[1]);
+            STRAPLOG("Repaired missing roothide marker %@ -> %@", markerRelativePath, markerTarget);
         } else if (S_ISLNK(markerStat.st_mode) && access(markerCPath, F_OK) != 0) {
             // Repair a dangling marker link, which otherwise makes /bin/sh
             // appear to be missing even when usr/bin/dash is present.
-            if (unlink(markerCPath) != 0 || symlink(entry[1].UTF8String, markerCPath) != 0) {
+            if (unlink(markerCPath) != 0 || symlink(markerTarget.UTF8String, markerCPath) != 0) {
                 return errno;
             }
-            STRAPLOG("Repaired dangling roothide marker %@ -> %@", entry[0], entry[1]);
+            STRAPLOG("Repaired dangling roothide marker %@ -> %@", markerRelativePath, markerTarget);
         }
     }
 
