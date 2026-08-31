@@ -459,11 +459,12 @@ __attribute__((constructor)) static void initializer(void)
 		// Initialize roothider with executable path
 		roothide_init_with_executable(gExecutablePath);
 
-		// Load rootlesshooks / watchdoghook when neccessary
+		// Load RootHide's LaunchServices/SpringBoard/cfprefsd hooks. Loading the
+		// vanilla rootless hook here drops RootHide's hiding and cache handling.
 		if (!strcmp(gExecutablePath, "/usr/sbin/cfprefsd") ||
 			!strcmp(gExecutablePath, "/System/Library/CoreServices/SpringBoard.app/SpringBoard") ||
 			!strcmp(gExecutablePath, "/usr/libexec/lsd")) {
-			dlopen(JBROOT_PATH("/basebin/rootlesshooks.dylib"), RTLD_NOW);
+			dlopen(JBROOT_PATH("/basebin/roothidehooks.dylib"), RTLD_NOW);
 		}
 		else if (!strcmp(gExecutablePath, "/usr/libexec/watchdogd")) {
 			dlopen(JBROOT_PATH("/basebin/watchdoghook.dylib"), RTLD_NOW);

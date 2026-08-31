@@ -669,9 +669,16 @@ void *boomerang_server(struct boomerang_info *info)
         return;
     }
     
+    NSString *safeModeMarkerPath = JBROOT_PATH(@"/basebin/.safe_mode");
     if (!tweaksEnabled) {
         printf("Creating safe mode marker file since tweaks were disabled in settings\n");
-        [[NSData data] writeToFile:JBROOT_PATH(@"/basebin/.safe_mode") atomically:YES];
+        [[NSData data] writeToFile:safeModeMarkerPath atomically:YES];
+    }
+    else {
+        // A marker created by a previous failed/disabled run otherwise wins
+        // over the enabled pre-jailbreak setting and silently disables every
+        // tweak for the new userspace boot.
+        [[NSFileManager defaultManager] removeItemAtPath:safeModeMarkerPath error:nil];
     }
     
     [[DOUIManager sharedInstance] sendLog:DOLocalizedString(@"Loading BaseBin TrustCache") debug:NO];

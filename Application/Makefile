@@ -22,6 +22,9 @@ else
 build/Build/Products/Debug-iphoneos/Dopamine.app: FORCE
 	xcodebuild -scheme Dopamine -derivedDataPath build -destination 'generic/platform=iOS' CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO
 endif
+	# launchdhook only permits a RootHide-compatible Dopamine to relaunch after
+	# activation. Keep the sidecar marker used by the official RootHide build.
+	touch build/Build/Products/Debug-iphoneos/Dopamine.app/Dopamine.roothide
 
 clean:
 	rm -rf build Payload Dopamine.ipa Dopamine.tipa
