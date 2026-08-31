@@ -726,13 +726,11 @@ void *boomerang_server(struct boomerang_info *info)
     
     [[DOEnvironmentManager sharedManager] setIDownloadEnabled:idownloadEnabled needsUnsandbox:NO];
     
-    [[DOUIManager sharedInstance] sendLog:DOLocalizedString(@"Checking For Duplicate Apps") debug:NO];
-    *errOut = [self ensureNoDuplicateApps];
-    if (*errOut) {
-        [self cleanUpPostExploitation];
-        *showLogs = NO;
-        return;
-    }
+    // RootHide re-randomizes .jbroot-<jbrand> on every jailbreak. Until the
+    // following userspace reboot rebuilds LaunchServices, its icon cache can
+    // legitimately still reference the previous (now missing) jbroot path.
+    // Dopamine2-roothide intentionally disables this rootless-only duplicate
+    // app guard because it otherwise rejects every re-randomized bootstrap.
     *errOut = [self cleanUpPostExploitation];
 
 
