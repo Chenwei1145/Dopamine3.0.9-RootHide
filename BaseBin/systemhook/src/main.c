@@ -209,10 +209,16 @@ bool should_enable_tweaks(void)
 		}
 	}
 
-	if (jbclient_dopamine_is_jailbroken(NULL)) {
-		// Probe whether we are the Dopamine app
-		// Only the Dopamine app is allowed to contact this domain
-		// In this case we want to disable tweak injection to prevent jailbreak detections etc messing with the app functionality
+	// The RootHide port shares the Dopamine XPC domain with non-blacklisted
+	// processes, so jbclient_dopamine_is_jailbroken() is no longer an identity
+	// check: it returns true for SpringBoard and every other allowed process.
+	// Using it here therefore disables TweakLoader system-wide.  We already have
+	// the canonical executable path, and the same suffix is used by the RootHide
+	// Dopamine-specific path hook below, so restrict the exclusion to the app
+	// itself.
+	if (string_has_suffix(gExecutablePath, "/Dopamine.app/Dopamine")) {
+		// Keep tweaks out of Dopamine to avoid jailbreak-detection tweaks making
+		// the jailbreak app unstable after activation.
 		return false;
 	}
 
