@@ -1216,6 +1216,56 @@ int getCFMajorVersion(void)
     return 0;
 }
 
+-(int) ensureTweakInjectJbrootMarker
+{
+    // RootHide-converted tweaks resolve jailbreak dependencies through paths
+    // such as @loader_path/.jbroot/usr/lib/libsubstrate.dylib.  The real tweak
+    // directory is /usr/lib/TweakInject, so it needs its own marker link.  The
+    // trust scanner normally creates this lazily, but an already-installed
+    // tweak can be reached by TweakLoader before that scan has repaired the
+    // directory, causing every converted tweak to fail at dlopen time.
+    NSString *tweakInjectDirectory = jbrootPrefix(@"/usr/lib/TweakInject");
+    BOOL isDirectory = NO;
+    if (!tweakInjectDirectory ||
+        ![[NSFileManager defaultManager] fileExistsAtPath:tweakInjectDirectory isDirectory:&isDirectory] ||
+        !isDirectory) {
+        // Tweak injection packages are optional, so a missing directory is not
+        // a bootstrap failure.
+        return 0;
+    }
+
+    NSString *markerPath = [tweakInjectDirectory stringByAppendingPathComponent:@".jbroot"];
+    const char *markerCPath = markerPath.fileSystemRepresentation;
+    struct stat markerStat = {0};
+    if (lstat(markerCPath, &markerStat) == 0) {
+        if (!S_ISLNK(markerStat.st_mode)) {
+            return EEXIST;
+        }
+        if (access(markerCPath, F_OK) == 0) {
+            return 0;
+        }
+        if (unlink(markerCPath) != 0) {
+            return errno;
+        }
+    } else if (errno != ENOENT) {
+        return errno;
+    }
+
+    // /usr/lib/TweakInject/../../.. resolves to the current hidden jbroot and
+    // remains valid when the whole .jbroot-<jbrand> directory is renamed.
+    if (symlink("../../..", markerCPath) != 0) {
+        return errno;
+    }
+    if (access(markerCPath, F_OK) != 0) {
+        int accessError = errno;
+        unlink(markerCPath);
+        return accessError;
+    }
+
+    STRAPLOG("Repaired missing roothide marker /usr/lib/TweakInject/.jbroot -> ../../..");
+    return 0;
+}
+
 - (NSError *)finalizeBootstrap
 {
     // Initial setup on first jailbreak
@@ -1255,6 +1305,15 @@ int getCFMajorVersion(void)
         if (r != 0) {
             return [NSError errorWithDomain:bootstrapErrorDomain code:BootstrapErrorCodeFailedFinalising userInfo:@{NSLocalizedDescriptionKey : [NSString stringWithFormat:@"updatelinks.sh returned %d\n", r]}];
         }
+    }
+
+    // Do this on both the initial bootstrap and every later jailbreak.  It is
+    // required by RootHide-patched tweak install names and is cheap/idempotent.
+    int tweakInjectMarkerResult = [self ensureTweakInjectJbrootMarker];
+    if (tweakInjectMarkerResult != 0) {
+        return [NSError errorWithDomain:bootstrapErrorDomain
+                                   code:BootstrapErrorCodeFailedFinalising
+                               userInfo:@{NSLocalizedDescriptionKey : [NSString stringWithFormat:@"ensureTweakInjectJbrootMarker returned %d (%s), jbroot=%@\n", tweakInjectMarkerResult, strerror(tweakInjectMarkerResult), find_jbroot(NO) ?: @"<missing>"]}];
     }
     
     BOOL shouldInstallLibkrw = [self shouldInstallPackage:@"libkrw0-dopamine"];
