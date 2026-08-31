@@ -65,9 +65,19 @@ void directory_collect_untrusted_cdhashes_by_path(const char *directoryPath, boo
 		cdhash_t *thisCdhashes = NULL;
 		uint32_t thiscdhashCount = 0;
 		fat_collect_untrusted_cdhashes(fat, &thisCdhashes, &thiscdhashCount);
-		cdhashCount += thiscdhashCount;
-		cdhashes = realloc(cdhashes, cdhashCount * sizeof(cdhash_t));
-		memcpy(&cdhashes[cdhashCount-thiscdhashCount], thisCdhashes, sizeof(cdhash_t) * thiscdhashCount);
+		if (thisCdhashes && thiscdhashCount > 0) {
+			uint32_t previousCount = cdhashCount;
+			uint32_t newCount = previousCount + thiscdhashCount;
+			cdhash_t *resized = realloc(cdhashes, newCount * sizeof(cdhash_t));
+			if (!resized) {
+				free(thisCdhashes);
+				return;
+			}
+			cdhashes = resized;
+			memcpy(&cdhashes[previousCount], thisCdhashes, sizeof(cdhash_t) * thiscdhashCount);
+			cdhashCount = newCount;
+			free(thisCdhashes);
+		}
 	}, recursive);
 
 	*cdhashesOut = cdhashes;
@@ -81,8 +91,9 @@ int jb_trustcache_add_file(const char *filePath)
 	file_collect_untrusted_cdhashes_by_path(filePath, &cdhashes, &cdhashCount);
 
 	if (cdhashes && cdhashCount > 0) {
-		jb_trustcache_add_cdhashes(cdhashes, cdhashCount);
+		int ret = jb_trustcache_add_cdhashes(cdhashes, cdhashCount);
 		free(cdhashes);
+		return ret;
 	}
 
 	return 0;
@@ -96,8 +107,9 @@ int jb_trustcache_add_directory(const char *directoryPath, bool recursive)
 	directory_collect_untrusted_cdhashes_by_path(directoryPath, recursive, &cdhashes, &cdhashCount);
 	if (cdhashes && cdhashCount > 0) {
 		printf("Added %u cdhashes\n", cdhashCount);
-		jb_trustcache_add_cdhashes(cdhashes, cdhashCount);
+		int ret = jb_trustcache_add_cdhashes(cdhashes, cdhashCount);
 		free(cdhashes);
+		return ret;
 	}
 
 	return 0;

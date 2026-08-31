@@ -63,6 +63,7 @@ typedef NS_ENUM(NSInteger, JBErrorCode) {
     JBErrorCodeFailedInitProtection          = -12,
     JBErrorCodeFailedInitFakeLib             = -13,
     JBErrorCodeFailedDuplicateApps           = -14,
+    JBErrorCodeFailedBootstrapTrustcache     = -15,
 };
 
 @implementation DOJailbreaker
@@ -369,6 +370,26 @@ typedef NS_ENUM(NSInteger, JBErrorCode) {
     return nil;
 }
 
+- (NSError *)loadBootstrapTrustcache
+{
+    // Bootstrap binaries are ad-hoc signed and their dependent libraries must
+    // be trusted before the first jbroot process is spawned. Do this on every
+    // jailbreak: rebooting drops the dynamic trustcache while the persistent
+    // .installed_dopamine marker remains on disk.
+    const char *bootstrapRootPath = JBROOT_PATH("/");
+    if (!bootstrapRootPath || access(bootstrapRootPath, R_OK | X_OK) != 0) {
+        return [NSError errorWithDomain:JBErrorDomain code:JBErrorCodeFailedBootstrapTrustcache
+            userInfo:@{NSLocalizedDescriptionKey : @"Bootstrap root is unavailable for trustcache preparation."}];
+    }
+
+    int ret = jb_trustcache_add_directory(bootstrapRootPath, true);
+    if (ret != 0) {
+        return [NSError errorWithDomain:JBErrorDomain code:JBErrorCodeFailedBootstrapTrustcache
+            userInfo:@{NSLocalizedDescriptionKey : [NSString stringWithFormat:@"Failed to load Bootstrap trustcache: %d", ret]}];
+    }
+    return nil;
+}
+
 struct boomerang_info {
     mach_port_t serverPort;
     dispatch_semaphore_t boomerangDone;
@@ -655,6 +676,13 @@ void *boomerang_server(struct boomerang_info *info)
     
     [[DOUIManager sharedInstance] sendLog:DOLocalizedString(@"Loading BaseBin TrustCache") debug:NO];
     *errOut = [self loadBasebinTrustcache];
+    if (*errOut) {
+        [self cleanUpPostExploitation];
+        return;
+    }
+
+    [[DOUIManager sharedInstance] sendLog:@"Preparing Bootstrap TrustCache" debug:NO];
+    *errOut = [self loadBootstrapTrustcache];
     if (*errOut) {
         [self cleanUpPostExploitation];
         return;
