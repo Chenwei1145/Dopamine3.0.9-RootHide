@@ -1,0 +1,9 @@
+Package: com.chenwei1145.touchpoint
+Name: TouchPoint
+Version: 1.0.0
+Architecture: iphoneos-arm64
+Description: Global SpringBoard touch indicator with configurable settings.
+Maintainer: Chenwei1145
+Author: Chenwei1145
+Section: Tweaks
+Depends: firmware (>= 15.0), mobilesubstrate

@@ -22,6 +22,9 @@ clean:
 	@$(MAKE) -C Application clean
 	@$(MAKE) -C Standalone clean
 
+touchpoint:
+	@$(MAKE) -C TouchPoint package
+
 update: all
 	ssh $(DEVICE) "rm -rf /var/mobile/Documents/Dopamine.tipa"
 	scp -C ./Application/Dopamine.tipa "$(DEVICE):/var/mobile/Documents/Dopamine.tipa"
@@ -32,4 +35,4 @@ update-basebin: all
 	scp -C ./BaseBin/basebin.tar "$(DEVICE):/var/mobile/Documents/basebin.tar"
 	ssh $(DEVICE) "/var/jb/basebin/jbctl update basebin /var/mobile/Documents/basebin.tar"
 
-.PHONY: update clean
+.PHONY: update clean touchpoint
