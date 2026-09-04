@@ -168,9 +168,6 @@ jobs:
           for ((i=0; i<$itemcount; i++)); do if [ "$(plutil -extract items.$i.headerCellClass raw ./Application/Dopamine/UI/Settings/Credits.plist)" = "DOCreditsCell" ]; then DOCreditsCellIndex=$i; break; fi; done;
           plutil -insert items.$DOCreditsCellIndex.names -xml "<dict><key>name</key><string>${{ github.actor }}</string><key>link</key><string>https://github.com/${{ github.repository }}</string></dict>" -append ./Application/Dopamine/UI/Settings/Credits.plist
           gmake -j$(sysctl -n hw.logicalcpu) NIGHTLY=1
-          # Build the standalone global touch indicator package separately;
-          # it is intentionally not embedded in the Dopamine jailbreak app.
-          gmake -C TouchPoint package
           VERSION=$(cat ./BaseBin/_external/basebin/.version)-$(git rev-parse --short HEAD)
           mv ./Application/Dopamine.tipa  "./Application/roothide-Dopamine-${VERSION}.tipa"
           echo "version=${VERSION}" >> $GITHUB_ENV
@@ -182,4 +179,3 @@ jobs:
           name: roothide-Dopamine-${{ env.version }}.tipa
           path: |
             ${{ github.workspace }}/Application/roothide-Dopamine-${{ env.version }}.tipa
-            ${{ github.workspace }}/TouchPoint/packages/*.deb
