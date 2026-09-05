@@ -12,6 +12,13 @@ export THEOS=$HOME/theos
 ./build_jailbreak_detector.sh
 ```
 
+如果出现 `libxml2.so.2: cannot open shared object file`，安装 Swift 工具链依赖后重试：
+
+```bash
+sudo apt update
+sudo apt install -y libxml2
+```
+
 产物位于 `JailbreakDetector/output/`，包括 `.ipa` 和 `.deb`。Theos 会使用 `ldid` 进行 ad-hoc 签名；如需安装到设备，可通过 Sileo、TrollStore 或你现有的签名流程安装。
 
 ## 结果解释

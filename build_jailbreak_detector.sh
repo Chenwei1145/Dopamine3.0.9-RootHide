@@ -19,6 +19,15 @@ for command_name in rsync make zip; do
   command -v "$command_name" >/dev/null 2>&1 || { echo "缺少命令：$command_name" >&2; exit 1; }
 done
 
+if command -v ldconfig >/dev/null 2>&1 && ! ldconfig -p 2>/dev/null | grep -q 'libxml2\.so\.2'; then
+  cat >&2 <<'EOF'
+缺少 Swift 工具链依赖 libxml2.so.2。
+请在 WSL 执行：sudo apt update && sudo apt install -y libxml2
+然后重新运行本脚本。
+EOF
+  exit 1
+fi
+
 # 在 Linux 文件系统中编译，避免 /mnt/c 的权限、时间戳和 ldid 问题。
 mkdir -p "$BUILD_DIR" "$OUTPUT_DIR"
 rsync -a --delete --exclude='.theos/' --exclude='packages/' --exclude='output/' "$SOURCE_DIR/" "$BUILD_DIR/"
