@@ -5,18 +5,25 @@
 static NSString * const TPDomain = @"com.chenwei1145.touchpoint";
 static NSString * const TPChanged = @"com.chenwei1145.touchpoint.changed";
 
+static NSUserDefaults *tpDefaults(void) {
+    static NSUserDefaults *defaults;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{ defaults = [[NSUserDefaults alloc] initWithSuiteName:TPDomain]; });
+    return defaults ?: [NSUserDefaults standardUserDefaults];
+}
+
 static BOOL tpBool(NSString *key, BOOL fallback) {
-    NSNumber *v = [[NSUserDefaults standardUserDefaults] objectForKey:key];
+    NSNumber *v = [tpDefaults() objectForKey:key];
     return v ? v.boolValue : fallback;
 }
 static CGFloat tpFloat(NSString *key, CGFloat fallback) {
-    NSNumber *v = [[NSUserDefaults standardUserDefaults] objectForKey:key];
+    NSNumber *v = [tpDefaults() objectForKey:key];
     return v ? v.doubleValue : fallback;
 }
 static UIColor *tpColor(void) {
-    NSNumber *r = [[NSUserDefaults standardUserDefaults] objectForKey:@"red"];
-    NSNumber *g = [[NSUserDefaults standardUserDefaults] objectForKey:@"green"];
-    NSNumber *b = [[NSUserDefaults standardUserDefaults] objectForKey:@"blue"];
+    NSNumber *r = [tpDefaults() objectForKey:@"red"];
+    NSNumber *g = [tpDefaults() objectForKey:@"green"];
+    NSNumber *b = [tpDefaults() objectForKey:@"blue"];
     return [UIColor colorWithRed:r ? r.doubleValue : 0.10 green:g ? g.doubleValue : 0.65 blue:b ? b.doubleValue : 1.0 alpha:1.0];
 }
 
@@ -78,14 +85,47 @@ static UIColor *tpColor(void) {
 
 static TPOverlayView *gOverlay;
 static UIWindow *gWindow;
+static UIWindow *gHostWindow;
+static void tpEnsureOverlay(void);
 static void tpSettingsChanged(CFNotificationCenterRef center, void *observer, CFStringRef name, const void *object, CFDictionaryRef userInfo) {
-    dispatch_async(dispatch_get_main_queue(), ^{ [gOverlay reloadSettings]; });
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if (tpBool(@"enabled", YES)) {
+            tpEnsureOverlay();
+            [gOverlay reloadSettings];
+            gWindow.hidden = NO;
+        } else {
+            gWindow.hidden = YES;
+        }
+    });
 }
 static void tpEnsureOverlay(void) {
     if (!tpBool(@"enabled", YES)) return;
     if (gWindow) return;
     UIScreen *screen = UIScreen.mainScreen;
-    gWindow = [[UIWindow alloc] initWithFrame:screen.bounds];
+    // Prefer SpringBoard's existing window scene; an unattached standalone
+    // UIWindow can be invisible on iOS 13+ even when made key and visible.
+    #pragma clang diagnostic push
+    #pragma clang diagnostic ignored "-Wdeprecated-declarations"
+    UIWindow *host = UIApplication.sharedApplication.keyWindow;
+    if (!host) {
+        for (UIWindow *candidate in UIApplication.sharedApplication.windows) {
+            if (!candidate.hidden && candidate.bounds.size.width > 0) { host = candidate; break; }
+        }
+    }
+    #pragma clang diagnostic pop
+    if (@available(iOS 13.0, *)) {
+        UIWindowScene *scene = nil;
+        for (UIScene *candidate in UIApplication.sharedApplication.connectedScenes) {
+            if ([candidate isKindOfClass:UIWindowScene.class] && candidate.activationState != UISceneActivationStateUnattached) {
+                scene = (UIWindowScene *)candidate;
+                break;
+            }
+        }
+        if (!scene) scene = host.windowScene;
+        gWindow = scene ? [[UIWindow alloc] initWithWindowScene:scene] : [[UIWindow alloc] initWithFrame:screen.bounds];
+    } else {
+        gWindow = [[UIWindow alloc] initWithFrame:screen.bounds];
+    }
     gWindow.windowLevel = UIWindowLevelAlert + 100.0;
     gWindow.backgroundColor = UIColor.clearColor;
     gWindow.userInteractionEnabled = NO;
@@ -95,15 +135,23 @@ static void tpEnsureOverlay(void) {
     gWindow.rootViewController = vc;
     [gWindow makeKeyAndVisible];
     gWindow.hidden = NO;
+    gOverlay.frame = gWindow.bounds;
+    if (!gWindow.windowScene && host) {
+        // Fallback for SpringBoard's legacy/non-scene window: attach directly
+        // to an existing visible window instead of creating an unattached one.
+        gWindow.hidden = YES;
+        gHostWindow = host;
+        gOverlay.frame = host.bounds;
+        [host addSubview:gOverlay];
+    }
     CFNotificationCenterAddObserver(CFNotificationCenterGetDarwinNotifyCenter(), NULL, tpSettingsChanged, (__bridge CFStringRef)TPChanged, NULL, CFNotificationSuspensionBehaviorDeliverImmediately);
 }
 
-%hook UIApplication
-- (void)sendEvent:(UIEvent *)event {
-    %orig;
+// TouchVisualizer-style event pipeline: enumerate every touch in each
+// UIApplication event and keep one visual marker per UITouch identity.
+static void tpHandleEvent(UIEvent *event) {
     if (!gOverlay || !tpBool(@"enabled", YES)) return;
     NSUInteger maxTouches = (NSUInteger)MAX(1, MIN(10, tpFloat(@"maxTouches", 5)));
-    NSUInteger active = gOverlay.dots.count;
     for (UITouch *touch in event.allTouches) {
         if (touch.phase == UITouchPhaseBegan || touch.phase == UITouchPhaseMoved || touch.phase == UITouchPhaseStationary) {
             if (gOverlay.dots.count < maxTouches || [gOverlay.dots objectForKey:[NSValue valueWithNonretainedObject:touch]]) [gOverlay placeTouch:touch];
@@ -111,11 +159,21 @@ static void tpEnsureOverlay(void) {
             [gOverlay endTouch:touch];
         }
     }
-    (void)active;
+}
+
+%hook UIApplication
+- (void)sendEvent:(UIEvent *)event {
+    %orig;
+    tpHandleEvent(event);
 }
 %end
 
 %ctor {
-    [[NSUserDefaults standardUserDefaults] addSuiteNamed:TPDomain];
-    dispatch_async(dispatch_get_main_queue(), ^{ tpEnsureOverlay(); });
+    NSLog(@"[TouchPoint] loaded (TouchVisualizer-style event pipeline)");
+    dispatch_async(dispatch_get_main_queue(), ^{
+        tpEnsureOverlay();
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            tpEnsureOverlay();
+        });
+    });
 }

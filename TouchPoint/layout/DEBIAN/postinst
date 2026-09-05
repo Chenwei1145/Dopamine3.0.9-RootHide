@@ -1,0 +1,15 @@
+#!/bin/sh
+# RootHide validates the complete app bundle after installation. Re-sign the
+# staged app so users do not need to run ldid manually after every upgrade.
+for APP in /Applications/TouchPointSettings.app /var/jb/Applications/TouchPointSettings.app; do
+	if [ -d "$APP" ]; then
+		if [ -x /var/jb/usr/bin/ldid ]; then
+			/var/jb/usr/bin/ldid -S "$APP" >/dev/null 2>&1 || true
+		elif command -v ldid >/dev/null 2>&1; then
+			ldid -S "$APP" >/dev/null 2>&1 || true
+		fi
+		command -v uicache >/dev/null 2>&1 && uicache -p "$APP" >/dev/null 2>&1 || true
+		break
+	fi
+done
+exit 0

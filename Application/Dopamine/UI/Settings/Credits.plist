@@ -107,6 +107,18 @@
 					<key>link</key>
 					<string>https://x.com/wh1te4ever</string>
 				</dict>
+				<dict>
+					<key>name</key>
+					<string>ChatGPT</string>
+					<key>link</key>
+					<string>https://chatgpt.com</string>
+				</dict>
+				<dict>
+					<key>name</key>
+					<string>Chenwei1145（辅助测试）</string>
+					<key>link</key>
+					<string>https://github.com/Chenwei1145</string>
+				</dict>
 			</array>
 		</dict>
 		<dict>

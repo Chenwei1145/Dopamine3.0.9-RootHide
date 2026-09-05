@@ -4,14 +4,14 @@ static NSString * const TPDomain = @"com.chenwei1145.touchpoint";
 static NSString * const TPChanged = @"com.chenwei1145.touchpoint.changed";
 
 @interface TPSettingsController : UITableViewController
-@property(nonatomic) UISwitch *enabled;
-@property(nonatomic) UISlider *size;
-@property(nonatomic) UISlider *alpha;
-@property(nonatomic) UISlider *red;
-@property(nonatomic) UISlider *green;
-@property(nonatomic) UISlider *blue;
-@property(nonatomic) UISlider *maxTouches;
-@property(nonatomic) UISwitch *coords;
+@property(nonatomic, strong) UISwitch *enabled;
+@property(nonatomic, strong) UISlider *size;
+@property(nonatomic, strong) UISlider *alpha;
+@property(nonatomic, strong) UISlider *red;
+@property(nonatomic, strong) UISlider *green;
+@property(nonatomic, strong) UISlider *blue;
+@property(nonatomic, strong) UISlider *maxTouches;
+@property(nonatomic, strong) UISwitch *coords;
 @end
 
 @implementation TPSettingsController
@@ -33,7 +33,7 @@ static NSString * const TPChanged = @"com.chenwei1145.touchpoint.changed";
 - (void)reset { [[self prefs] removePersistentDomainForName:TPDomain]; [self viewDidLoad]; [self.tableView reloadData]; [self changed:nil]; }
 @end
 
-@interface TPAppDelegate : UIResponder <UIApplicationDelegate> @property(nonatomic) UIWindow *window; @end
+@interface TPAppDelegate : UIResponder <UIApplicationDelegate> @property(nonatomic, strong) UIWindow *window; @end
 @implementation TPAppDelegate
 - (BOOL)application:(UIApplication *)app didFinishLaunchingWithOptions:(NSDictionary *)opts { self.window=[[UIWindow alloc] initWithFrame:UIScreen.mainScreen.bounds]; UINavigationController *n=[[UINavigationController alloc] initWithRootViewController:[TPSettingsController new]]; self.window.rootViewController=n; [self.window makeKeyAndVisible]; return YES; }
 @end
