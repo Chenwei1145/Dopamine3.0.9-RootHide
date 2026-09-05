@@ -14,4 +14,7 @@ Tools/fastPathSign/.build_*
 Exploits/kfd/kfd.framework/kfd
 TouchPoint/.theos/
 TouchPoint/packages/
+JailbreakDetector/.theos/
+JailbreakDetector/packages/
+JailbreakDetector/output/
 .sign

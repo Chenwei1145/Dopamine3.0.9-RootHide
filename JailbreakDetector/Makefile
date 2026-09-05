@@ -1,6 +1,8 @@
-TARGET = JailbreakDetector
-ARCHS = arm64e
-INSTALL_TARGET_PROCESSES = SpringBoard
+TARGET = iphone:clang:latest:14.0
+# arm64 runs on the A13 and avoids the incompatible arm64e Swift ABI warning
+# emitted by the Linux cross-toolchain.
+ARCHS = arm64
+INSTALL_TARGET_PROCESSES = JailbreakDetector
 
 include $(THEOS)/makefiles/common.mk
 
