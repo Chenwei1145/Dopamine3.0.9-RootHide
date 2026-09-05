@@ -19,6 +19,8 @@ sudo apt update
 sudo apt install -y libxml2
 ```
 
+如果你的发行版提示 `Package 'libxml2' has no installation candidate`，先执行 `sudo apt update`；较新的发行版可尝试 `sudo apt install -y libxml2t64`。若仍无 candidate，说明 WSL 的 apt 软件源缺失，需要修复 `/etc/apt/sources.list*`。构建脚本也会自动搜索 Swift 工具链目录中的 `libxml2.so.2` 并设置 `LD_LIBRARY_PATH`。
+
 产物位于 `JailbreakDetector/output/`，包括 `.ipa` 和 `.deb`。Theos 会使用 `ldid` 进行 ad-hoc 签名；如需安装到设备，可通过 Sileo、TrollStore 或你现有的签名流程安装。
 
 ## 结果解释

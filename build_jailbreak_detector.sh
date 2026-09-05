@@ -20,12 +20,21 @@ for command_name in rsync make zip; do
 done
 
 if command -v ldconfig >/dev/null 2>&1 && ! ldconfig -p 2>/dev/null | grep -q 'libxml2\.so\.2'; then
-  cat >&2 <<'EOF'
-缺少 Swift 工具链依赖 libxml2.so.2。
-请在 WSL 执行：sudo apt update && sudo apt install -y libxml2
-然后重新运行本脚本。
+  # Some Swift distributions ship the runtime library beside the toolchain.
+  # Use it when available before asking the user to repair apt sources.
+  SWIFT_XML2="$(find "$HOME" -type f -name 'libxml2.so.2*' 2>/dev/null | head -n 1 || true)"
+  if [[ -n "$SWIFT_XML2" ]]; then
+    export LD_LIBRARY_PATH="$(dirname "$SWIFT_XML2")${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+    echo "使用 Swift 工具链自带的 libxml2：$SWIFT_XML2"
+  else
+    cat >&2 <<'EOF'
+缺少 Swift 工具链依赖 libxml2.so.2，且当前 apt 没有可用的软件源。
+请先执行：sudo apt update
+然后按发行版尝试：sudo apt install -y libxml2 或 sudo apt install -y libxml2t64
+如果仍提示没有 candidate，请检查 /etc/apt/sources.list* 是否配置了 Ubuntu/Debian 官方源。
 EOF
-  exit 1
+    exit 1
+  fi
 fi
 
 # 在 Linux 文件系统中编译，避免 /mnt/c 的权限、时间戳和 ldid 问题。
