@@ -5,9 +5,6 @@
 	path = BaseBin/XPF
 	# roothide support (namecache/amfi_oids finders) hosted on our fork: opa334/XPF + commit 8b19b8b (branch roothide-support)
 	url = https://github.com/0xMachO/XPF
-[submodule "Exploits/kfd/src/kfd"]
-	path = Application/Dopamine/Dopamine/Exploits/kfd/kfd
-	url = https://github.com/opa334/kfd
 [submodule "BaseBin/opainject"]
 	path = BaseBin/opainject
 	url = https://github.com/opa334/opainject
