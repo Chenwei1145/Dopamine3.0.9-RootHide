@@ -1,0 +1,8 @@
+Package: com.chenwei1145.jailbreakdetector
+Name: RootHide Detector
+Version: 1.0.0
+Architecture: iphoneos-arm64e
+Description: SwiftUI RootHide jailbreak visibility detector
+Maintainer: Chenwei1145
+Author: Chenwei1145
+Section: Utilities
